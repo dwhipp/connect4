@@ -1,8 +1,9 @@
-#ifndef _BOARD_H
-#define _BOARD_H
+#ifndef _Board_h_
+#define _Board_h_
 
 #include <cinttypes>
 #include <iostream>
+#include <vector>
 
 class Board {
   public:
@@ -12,6 +13,8 @@ class Board {
     static Board *New(uint64_t position = 0);
     virtual ~Board() {}
 
+    virtual bool IsValidMove(int column) const = 0;
+    virtual std::vector<int> ValidMoves() const = 0;
     virtual bool PlayStone(bool player, int column) = 0;
 
     virtual uint64_t Encode() const = 0;

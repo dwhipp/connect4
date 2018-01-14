@@ -1,19 +1,23 @@
 #include "Board.h"
+#include "Player.h"
+
 #include <iostream>
 
 int main() {
-  Board& b = *Board::New();
-  b.PlayStone(true, 3);
-  b.PlayStone(false, 1);
-  b.PlayStone(true, 0);
-  b.PlayStone(false, 1);
-  b.PlayStone(true, 1);
-  b.PlayStone(false, 2);
-  b.PlayStone(true, 2);
-  b.PlayStone(false, 6);
-  b.PlayStone(true, 0);
-  std::cout << b << '\n';
+  Board* b = Board::New();
 
-  Board *b2 = Board::New(b.Encode());
-  std::cout << '\n' << *b2 << '\n';
+  Player* p[] = {
+    Player::NewHuman("Player 1"),
+    Player::NewHuman("Player 2")};
+
+  p[0]->StartGame(b, true);
+  p[1]->StartGame(b, false);
+
+  bool player_to_move = 0;
+  while (!b->ValidMoves().empty()) {
+    b->PlayStone(player_to_move == 0, p[player_to_move]->GetMove());
+    player_to_move = 1 - player_to_move;
+  }
+
+  std::cout << '\n' << *b << '\n';
 }

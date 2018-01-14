@@ -19,8 +19,29 @@ class BoardImpl : public Board {
   const uint64_t kHeightMask = (1ull << kHeightBits) - 1;
   std::vector<std::vector<bool>> cells;
 
+  bool IsValidMove(int column) const override {
+    if ((column < 0) || (column >= cells.size())) {
+      return false;
+    }
+    return cells[column].size() < kHeight;
+  }
+
+  std::vector<int> ValidMoves() const override {
+    std::vector<int> result;
+    for (int i = 0; i < kWidth; ++i) {
+      if (IsValidMove(i)) {
+        result.push_back(i);
+      }
+    }
+    return result;
+  }
+
   bool PlayStone(bool player, int column) override {
-    if (cells.size() <= column) {
+    std::cout << "MOVE: " << column << "\n";
+    if (column < 0) {
+      throw std::out_of_range("column index too small");
+    }
+    if (column >= cells.size()) {
       throw std::out_of_range("column index too large");
     }
     if (cells[column].size() > kHeight) {
