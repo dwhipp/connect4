@@ -1,5 +1,7 @@
 #include "Board.h"
 
+#include <utility>
+#include <optional>
 #include <vector>
 #include <exception>
 
@@ -14,16 +16,51 @@ namespace {
   }
 }
 
+class Slice {
+  public:
+    Slice(std::vector<std::vector<bool>>& data, std::pair<int, int> center) :
+      data_(data), center_(center) {}
+
+    int SpanLength(std::pair<int, int> direction) const {
+      int length = 1;
+      bool root = ValueAt(center_);
+      for (int i = 1; IsSame(root, i, direction); ++i) ++length;
+      for (int i = -1; IsSame(root, i, direction); --i) ++length;
+      return length;
+    }
+
+  private:
+    bool ValueAt(std::pair<int, int> point) const {
+      return data_[point.second][point.first];
+    }
+
+    bool IsSame(bool value, int index, std::pair<int,int> direction) const {
+      int col = center_.second + index * direction.second;
+      int row = center_.first + index * direction.first;
+      if (row < 0 || col < 0 ||
+          col >= (int)data_.size() || row >= (int)data_[col].size()) {
+        return false;
+      }
+      return data_[col][row] == value;
+    }
+
+  private:
+    const std::vector<std::vector<bool>>& data_;
+    std::pair<int, int> center_;
+
+};
+
 class BoardImpl : public Board {
   const int kHeightBits = intlog2(kHeight);
   const uint64_t kHeightMask = (1ull << kHeightBits) - 1;
   std::vector<std::vector<bool>> cells;
+  std::optional<std::pair<int,int>> winning_position_;
 
   bool IsValidMove(int column) const override {
-    if ((column < 0) || (column >= cells.size())) {
+    if ((column < 0) || (column >= (int)cells.size())) {
       return false;
     }
-    return cells[column].size() < kHeight;
+    return (int)cells[column].size() < kHeight;
   }
 
   std::vector<int> ValidMoves() const override {
@@ -41,22 +78,38 @@ class BoardImpl : public Board {
     if (column < 0) {
       throw std::out_of_range("column index too small");
     }
-    if (column >= cells.size()) {
+    if (column >= (int)cells.size()) {
       throw std::out_of_range("column index too large");
     }
-    if (cells[column].size() > kHeight) {
+    int height = cells[column].size();
+    if (height > kHeight) {
       throw std::overflow_error("column is full");
     }
     cells[column].push_back(player);
-    return true;
+
+    std::pair<int, int> pos = {height, column};
+    Slice s(cells, pos);
+    for (const auto& direction :
+        std::vector<std::pair<int, int>>{{0, 1}, {1, 0}, {1, -1}, {1, 1}}) {
+      if (s.SpanLength(direction) >= 4) {
+        winning_position_ = pos;
+        return true;
+      }
+    }
+
+    return false;
   }
 
-  char get_cell(int row, int column) const {
-    if ((column >= cells.size()) ||
-        (row >= cells[column].size())) {
+  char get_cell(int row, int col) const {
+    if ((col >= (int)cells.size()) ||
+        (row >= (int)cells[col].size())) {
       return '.';
     }
-    return cells[column][row] ? 'X' : 'O';
+    if (winning_position_ == std::pair<int, int>{row, col}) {
+      return cells[col][row] ? 'X' : 'O';
+    } else {
+      return cells[col][row] ? 'x' : 'o';
+    }
   }
 
   void Dump(std::ostream& os) const override {

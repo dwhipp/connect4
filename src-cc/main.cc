@@ -15,7 +15,10 @@ int main() {
 
   bool player_to_move = 0;
   while (!b->ValidMoves().empty()) {
-    b->PlayStone(player_to_move == 0, p[player_to_move]->GetMove());
+    if (b->PlayStone(player_to_move == 0, p[player_to_move]->GetMove())) {
+      std::cout << "\n\n" << *p[player_to_move] << " WINS!!!\n";
+      break;
+    }
     player_to_move = 1 - player_to_move;
   }
 
