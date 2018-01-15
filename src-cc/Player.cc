@@ -41,7 +41,6 @@ class HumanPlayer : public Player {
   const Board* board_;
 
   public:
-    virtual ~HumanPlayer() {}
     using Player::Player;
 };
 
@@ -110,8 +109,6 @@ class ComputerPlayer : public Player {
         EnsureValueInRange("sharpness", 0.0, sharpness, 1.0);
         EnsureValueInRange("discount", 0.0, discount, 1.0);
       }
-
-  virtual ~ComputerPlayer() {}
 };
 
 Player* Player::NewComputer(std::string_view name,

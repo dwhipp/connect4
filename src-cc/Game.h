@@ -1,3 +1,6 @@
+#ifndef Game_h_
+#define Game_h_
+
 #include <memory>
 #include <iostream>
 #include "Board.h"
@@ -19,3 +22,4 @@ inline std::ostream& operator << (std::ostream& os, const Game& game) {
   return os;
 }
 
+#endif

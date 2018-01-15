@@ -1,5 +1,5 @@
-#ifndef _Board_h_
-#define _Board_h_
+#ifndef Board_h_
+#define Board_h_
 
 #include <cinttypes>
 #include <iostream>
