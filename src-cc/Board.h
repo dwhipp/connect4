@@ -4,13 +4,17 @@
 #include <cinttypes>
 #include <iostream>
 #include <vector>
+#include <memory>
 
 class Board {
   public:
     const int kWidth = 7;
     const int kHeight = 6;
 
-    static Board *New(uint64_t position = 0);
+    static std::unique_ptr<Board> New(uint64_t position = 0);
+    std::unique_ptr<Board> Clone() const {
+      return New(Encode());
+    }
     virtual ~Board() {}
 
     virtual bool IsValidMove(int column) const = 0;

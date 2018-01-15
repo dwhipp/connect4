@@ -2,6 +2,8 @@
 #define Player_h_
 
 #include <iostream>
+#include <memory>
+#include <random>
 #include <string>
 #include <string_view>
 
@@ -10,6 +12,8 @@ class Board;
 class Player {
   public:
     static Player *NewHuman(std::string_view name);
+    static Player *NewComputer(std::string_view name,
+        std::unique_ptr<std::random_device> rd);
 
     std::string_view name() const { return name_; }
 

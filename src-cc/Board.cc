@@ -54,7 +54,7 @@ class BoardImpl : public Board {
   const int kHeightBits = intlog2(kHeight);
   const uint64_t kHeightMask = (1ull << kHeightBits) - 1;
   std::vector<std::vector<bool>> cells;
-  std::optional<std::pair<int,int>> winning_position_;
+  std::optional<std::pair<int,int>> last_move_;
 
   bool IsValidMove(int column) const override {
     if ((column < 0) || (column >= (int)cells.size())) {
@@ -74,7 +74,6 @@ class BoardImpl : public Board {
   }
 
   bool PlayStone(bool player, int column) override {
-    std::cout << "MOVE: " << column << "\n";
     if (column < 0) {
       throw std::out_of_range("column index too small");
     }
@@ -88,11 +87,11 @@ class BoardImpl : public Board {
     cells[column].push_back(player);
 
     std::pair<int, int> pos = {height, column};
+    last_move_ = pos;
     Slice s(cells, pos);
     for (const auto& direction :
         std::vector<std::pair<int, int>>{{0, 1}, {1, 0}, {1, -1}, {1, 1}}) {
       if (s.SpanLength(direction) >= 4) {
-        winning_position_ = pos;
         return true;
       }
     }
@@ -105,7 +104,7 @@ class BoardImpl : public Board {
         (row >= (int)cells[col].size())) {
       return '.';
     }
-    if (winning_position_ == std::pair<int, int>{row, col}) {
+    if (last_move_ == std::pair<int, int>{row, col}) {
       return cells[col][row] ? 'X' : 'O';
     } else {
       return cells[col][row] ? 'x' : 'o';
@@ -159,6 +158,6 @@ class BoardImpl : public Board {
   }
 };
 
-Board *Board::New(uint64_t position) {
-  return new BoardImpl(position);
+std::unique_ptr<Board> Board::New(uint64_t position) {
+  return std::unique_ptr<Board>(new BoardImpl(position));
 }
