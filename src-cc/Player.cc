@@ -91,7 +91,7 @@ class ComputerPlayer : public Player {
     }
     std::discrete_distribution<int> dist(weights.begin(), weights.end());
     int selection = dist(rand_);
-    std::cout << *this << " Plays " << selection << "\n\n";
+    std::cout << *this << " Plays " << (selection + 1) << "\n\n";
     return selection;
   }
 

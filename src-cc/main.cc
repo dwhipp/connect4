@@ -11,7 +11,7 @@ int main() {
 
   Game g(
     Player::NewHuman("Human"),
-    Player::NewComputer("Computer", 1, .99999, .9999, std::make_unique<std::random_device>()));
+    Player::NewComputer("Computer", 5, .9999, .999, std::make_unique<std::random_device>()));
 
   Player* result = g.Play();
 
