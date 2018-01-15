@@ -10,7 +10,7 @@ int main() {
 
   Player* p[] = {
     Player::NewHuman("Human"),
-    Player::NewComputer("Computer", std::make_unique<std::random_device>())};
+    Player::NewComputer("Computer", 6, .99999, .9999, std::make_unique<std::random_device>())};
 
   p[0]->StartGame(b.get(), true);
   p[1]->StartGame(b.get(), false);
