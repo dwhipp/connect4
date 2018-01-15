@@ -2,8 +2,22 @@
 #include <algorithm>
 #include <iostream>
 #include <exception>
+#include <cmath>
 #include <memory>
+#include <string>
+#include <string_view>
 #include "Board.h"
+
+namespace {
+  template<typename T1, typename T2> void EnsureValueInRange(std::string name, T2 min, T1 value, T2 max) {
+    if (value > min && value < max) {
+      return;
+    }
+    throw std::range_error(
+        "Invalid Value [" + name + "=" + std::to_string(value) + "]: NOT " +
+        std::to_string(min) + " < " + name + " < " + std::to_string(max));
+  }
+}
 
 class HumanPlayer : public Player {
   void StartGame(const Board* board, bool player_id) override {
@@ -76,22 +90,26 @@ class ComputerPlayer : public Player {
       std::cout << (i+1) << " = " << weights[i] << "\n";
     }
     std::discrete_distribution<int> dist(weights.begin(), weights.end());
-    int selection = dist(*random_device_);
+    int selection = dist(rand_);
     std::cout << *this << " Plays " << selection << "\n\n";
     return selection;
   }
 
   const Board* board_;
   bool player_id_;
-  std::unique_ptr<std::random_device> random_device_;
+  std::mt19937 rand_;
 
   public:
   ComputerPlayer(std::string_view name,
       int depth, double sharpness, double discount,
       std::unique_ptr<std::random_device> rd)
     : Player(name),
-      kMaxDepth(depth), kSharpness(sharpness), kDiscount(discount),
-      random_device_(std::move(rd)) {}
+      kMaxDepth(depth), kSharpness(sharpness), kDiscount(discount), rand_((*rd)())
+       {
+        EnsureValueInRange("depth", 0, depth, 10);
+        EnsureValueInRange("sharpness", 0.0, sharpness, 1.0);
+        EnsureValueInRange("discount", 0.0, discount, 1.0);
+      }
 
   virtual ~ComputerPlayer() {}
 };
