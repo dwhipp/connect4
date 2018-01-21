@@ -13,7 +13,7 @@ int main() {
   [[maybe_unused]] auto p2 = Player::NewBruteForce(
       "Brute Force", 5, .9999, .999, std::make_unique<std::random_device>());
   auto p3 = Player::NewMonteCarlo(
-      "Monte Carlo", 1000, std::make_unique<std::random_device>());
+      "Monte Carlo", 10000, std::make_unique<std::random_device>());
 
   Game g(p1, p3);
   Player* result = g.Play();

@@ -72,28 +72,28 @@ class MonteCarloPlayer : public Player {
       return dist(rand_);
     }
 
-    void Expand(uint64_t key, bool player) {
-      Node& node = tree_[key];
-      auto board = Board::New(key);
+    void Expand(uint64_t parent_key, bool player) {
+      Node& node = tree_[parent_key];
       if (node.is_terminal) {
         return;
       }
-      auto valid_moves = board->ValidMoves();
+      auto parent_board = Board::New(parent_key);
+      auto valid_moves = parent_board->ValidMoves();
       if (valid_moves.empty()) {
         node.is_terminal = true;
         node.reward = 1;
         return;
       }
       for (int move : valid_moves) {
-        auto b = board->Clone();
-        bool game_over = b->PlayStone(player, move);
-        uint64_t key = b->Encode();
+        auto child_board = parent_board->Clone();
+        bool game_over = child_board->PlayStone(player, move);
+        uint64_t child_key = child_board->Encode();
         if (game_over) {
-          auto& n = tree_[key];
+          auto& n = tree_[child_key];
           n.reward = (player == player_id_) ? 2 : 0;
           n.is_terminal = true;
         }
-        node.next.push_back(key);
+        node.next.push_back(child_key);
       }
     }
 
@@ -116,21 +116,18 @@ class MonteCarloPlayer : public Player {
     }
 
     int GetMove() override {
-      uint64_t key = board_->Encode();
       auto valid_moves = board_->ValidMoves();
 
       if (valid_moves.empty()) {
         throw std::runtime_error("no valid moves");
       }
-      if (valid_moves.size() == 1) {
-        return valid_moves.front();
-      }
 
+      uint64_t root_key = board_->Encode();
       for (int i = 0; i < kNumRollouts; ++i) {
-        Mcts(key, player_id_);
+        Mcts(root_key, player_id_);
       }
 
-      const Node& root = tree_[key];
+      const Node& root = tree_[root_key];
       std::cout << "Root visits: " << root.visits << '\n';
       int i = 0;
       for (uint64_t child : root.next) {
@@ -149,7 +146,7 @@ class MonteCarloPlayer : public Player {
           }
       }
 
-      int move = valid_moves[SelectNodeIndex(tree_[key], player_id_, false)];
+      int move = valid_moves[SelectNodeIndex(root, player_id_, false)];
       std::cout << "\nMCTS Plays " << (move+1) << '\n';
       return move;
     }
