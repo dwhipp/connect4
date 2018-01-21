@@ -8,8 +8,8 @@
 
 class Board {
   public:
-    const int kWidth = 7;
-    const int kHeight = 6;
+    static constexpr int kWidth = 7;
+    static constexpr int kHeight = 6;
 
     static std::unique_ptr<Board> New(uint64_t position = 0);
     std::unique_ptr<Board> Clone() const {

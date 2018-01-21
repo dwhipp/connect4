@@ -15,6 +15,8 @@ class Player {
     static Player *NewBruteForce(std::string_view name,
         int depth, double sharpness, double discount,
         std::unique_ptr<std::random_device> rd);
+    static Player *NewMonteCarlo(std::string_view name, int num_rollouts,
+        std::unique_ptr<std::random_device> rd);
 
     std::string_view name() const { return name_; }
 

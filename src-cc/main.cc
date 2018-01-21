@@ -9,10 +9,13 @@
 int main() {
   std::unique_ptr<Board> b = Board::New();
 
-  Game g(
-    Player::NewHuman("Human"),
-    Player::NewBruteForce("BruteForce", 5, .9999, .999, std::make_unique<std::random_device>()));
+  auto p1 = Player::NewHuman("Human");
+  [[maybe_unused]] auto p2 = Player::NewBruteForce(
+      "Brute Force", 5, .9999, .999, std::make_unique<std::random_device>());
+  auto p3 = Player::NewMonteCarlo(
+      "Monte Carlo", 1000, std::make_unique<std::random_device>());
 
+  Game g(p1, p3);
   Player* result = g.Play();
 
   std::cout << g << "\n\n";
