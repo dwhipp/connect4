@@ -31,12 +31,15 @@ class Slice {
 
   private:
     bool ValueAt(std::pair<int, int> point) const {
-      return data_[point.second][point.first];
+      auto [x,y] = point;
+      return data_[x][y];
     }
 
     bool IsSame(bool value, int index, std::pair<int,int> direction) const {
-      int col = center_.second + index * direction.second;
-      int row = center_.first + index * direction.first;
+      auto [x,y] = center_;
+      auto [dx,dy] = direction;
+      int col = x + index * dx;
+      int row = y + index * dy;
       if (row < 0 || col < 0 ||
           col >= (int)data_.size() || row >= (int)data_[col].size()) {
         return false;
@@ -86,11 +89,11 @@ class BoardImpl : public Board {
     }
     cells[column].push_back(player);
 
-    std::pair<int, int> pos = {height, column};
+    std::pair pos = {column, height};
     last_move_ = pos;
     Slice s(cells, pos);
-    for (const auto& direction :
-        std::vector<std::pair<int, int>>{{0, 1}, {1, 0}, {1, -1}, {1, 1}}) {
+    for (const auto& direction : std::initializer_list<std::pair<int, int>>{
+        {0, 1}, {1, 0}, {1, -1}, {1, 1}}) {
       if (s.SpanLength(direction) >= 4) {
         return true;
       }
@@ -104,7 +107,7 @@ class BoardImpl : public Board {
         (row >= (int)cells[col].size())) {
       return '.';
     }
-    if (last_move_ == std::pair<int, int>{row, col}) {
+    if (last_move_ == std::pair{col, row}) {
       return cells[col][row] ? 'X' : 'O';
     } else {
       return cells[col][row] ? 'x' : 'o';
