@@ -19,40 +19,8 @@ namespace {
   }
 }
 
-class HumanPlayer : public Player {
-  void StartGame(const Board* board, bool player_id) override {
-    (void) player_id;
-    board_ = board;
-  }
 
-  int GetMove() override {
-    int move;
-    while ((std::cout << "Player [" << *this << "]: ") &&
-        (std::cin >> move)) {
-      if (board_->IsValidMove(move - 1)) {
-        return move - 1;
-      }
-      std::cout << "Invalid move, try again.\n\n";
-    }
-
-    throw std::runtime_error("No move provided");
-  }
-
-  const Board* board_;
-
-  public:
-    using Player::Player;
-};
-
-Player* Player::NewHuman(std::string_view name) {
-  return new HumanPlayer(name);
-}
-
-
-
-
-
-class ComputerPlayer : public Player {
+class BruteForcePlayer : public Player {
 
  public:
   int kMaxDepth;
@@ -64,7 +32,7 @@ class ComputerPlayer : public Player {
     board_ = board;
   }
 
-  std::vector<double> EvaluateMoves(const Board* board, bool player, int depth) {
+  std::vector<double> GetPolicy(const Board* board, bool player, int depth) {
     std::vector<double> weights(board->kWidth);
     for (int move : board->ValidMoves()) {
       auto tmp = board->Clone();
@@ -74,7 +42,7 @@ class ComputerPlayer : public Player {
         weights[move] = 0.5;
       } else {
         std::vector<double> w =
-          EvaluateMoves(tmp.get(), !player, depth - 1);
+          GetPolicy(tmp.get(), !player, depth - 1);
         double worst_case = *std::max_element(w.begin(), w.end());
         weights[move] = 1 - (worst_case * kDiscount);
       }
@@ -84,7 +52,7 @@ class ComputerPlayer : public Player {
 
   int GetMove() override {
     std::vector<double> weights =
-      EvaluateMoves(board_, player_id_, kMaxDepth);
+      GetPolicy(board_, player_id_, kMaxDepth);
     for (unsigned int i = 0 ; i < weights.size(); i++) {
       std::cout << (i+1) << " = " << weights[i] << "\n";
     }
@@ -99,7 +67,7 @@ class ComputerPlayer : public Player {
   std::mt19937 rand_;
 
   public:
-  ComputerPlayer(std::string_view name,
+  BruteForcePlayer(std::string_view name,
       int depth, double sharpness, double discount,
       std::unique_ptr<std::random_device> rd)
     : Player(name),
@@ -111,8 +79,8 @@ class ComputerPlayer : public Player {
       }
 };
 
-Player* Player::NewComputer(std::string_view name,
+Player* Player::NewBruteForce(std::string_view name,
     int depth, double sharpness, double discount,
     std::unique_ptr<std::random_device> rd) {
-  return new ComputerPlayer(name, depth, sharpness, discount, std::move(rd));
+  return new BruteForcePlayer(name, depth, sharpness, discount, std::move(rd));
 }
