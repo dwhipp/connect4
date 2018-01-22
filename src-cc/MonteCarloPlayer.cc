@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -26,94 +27,127 @@ class MonteCarloPlayer : public Player {
     struct Node {
       int visits = 0;
       bool is_terminal;
-      int reward = 0;
+      float reward = 0;
       std::vector<uint64_t> next;
     };
 
-    double CalculateUct(const Node& node, int parent_visits, bool player) const {
-      if (node.visits == 0) {
-        return 1000.0;
-      }
-      double exploit = node.reward;
-      if (!node.is_terminal) {
-        exploit /= node.visits;
-      }
-      if (player != player_id_) {
-        exploit = 1 - exploit;
-      }
-      double explore = kExplorationParameter *
-        std::sqrt(std::log(parent_visits) / node.visits);
-      return exploit + explore;
-    }
+    struct Turn {
+      MonteCarloPlayer* player_;
+      uint64_t board_state_;
+      bool turn_player_id_;
+      bool is_opponent_;
+      Node& node_;
+      const Turn* parent_ = nullptr;
 
-    int SelectNodeIndex(const Node& node, bool player, bool use_utc) {
-      if (node.next.empty()) {
-        throw std::runtime_error(
-            "attempt to select next node from terminal state");
+      Turn(MonteCarloPlayer* player) :
+        player_(player),
+        board_state_(player->board_->Encode()),
+        turn_player_id_(player->player_id_),
+        is_opponent_(false),
+        node_(player_->tree_[board_state_])
+      {}
+
+      Turn(const Turn* parent, uint64_t board_state) :
+        player_(parent->player_),
+        board_state_(board_state),
+        turn_player_id_(!parent->turn_player_id_),
+        is_opponent_(!parent->is_opponent_),
+        node_(player_->tree_[board_state]),
+        parent_(parent)
+      {}
+
+      std::vector<Turn> NextTurns() const {
+        std::vector<Turn> turns;
+        for (uint64_t key : node_.next) {
+          turns.emplace_back(this, key);
+        }
+        return turns;
       }
-      std::vector<double> uct;
-      for (uint64_t key : node.next) {
-        const Node& n = tree_[key];
-        if (use_utc) {
-          uct.push_back(CalculateUct(n, node.visits, player));
-        } else {
-          uct.push_back(n.visits);
+
+      double CalculateUct() const {
+        if (node_.visits == 0) {
+          return 1000.0;
+        }
+        double exploit = node_.reward;
+        if (!node_.is_terminal) {
+          exploit /= node_.visits;
+        }
+        if (!is_opponent_) {
+          exploit = 1 - exploit;
+        }
+        double explore = player_->kExplorationParameter *
+          std::sqrt(std::log(parent_->node_.visits) / node_.visits);
+        return exploit + explore;
+      }
+
+      double CalculateRootScore() const {
+        return node_.visits;
+      }
+
+      int SelectNodeIndex(decltype(&Turn::CalculateUct) score_fn) const {
+        auto next_turns = NextTurns();
+        if (next_turns.empty()) {
+          throw std::runtime_error(
+              "attempt to select next node from terminal state");
+        }
+        std::vector<double> uct;
+        for (const auto& next_turn : next_turns) {
+          uct.push_back(std::invoke(score_fn, next_turn));
+        }
+
+        double highest = *std::max_element(uct.begin(), uct.end());
+        for (auto& elem : uct) {
+          if (elem != highest) {
+            elem = 0;
+          }
+        }
+
+        std::discrete_distribution<int> dist(uct.begin(), uct.end());
+        return dist(player_->rand_);
+      }
+
+      void Expand() {
+        if (node_.is_terminal) {
+          return;
+        }
+        auto parent_board = Board::New(board_state_);
+        auto valid_moves = parent_board->ValidMoves();
+        if (valid_moves.empty()) {
+          node_.is_terminal = true;
+          node_.reward = 0.5;
+          return;
+        }
+        for (int move : valid_moves) {
+          auto child_board = parent_board->Clone();
+          bool game_over = child_board->PlayStone(turn_player_id_, move);
+          Turn next_turn(this, child_board->Encode());
+          if (game_over) {
+            Node& child = next_turn.node_;
+            child.reward = is_opponent_ ? 0 : 1;
+            child.is_terminal = true;
+          }
+          node_.next.push_back(next_turn.board_state_);
         }
       }
 
-      double highest = *std::max_element(uct.begin(), uct.end());
-      for (auto& elem : uct) {
-        if (elem != highest) {
-          elem = 0;
+      float Mcts() {
+        if (node_.visits == 0) {
+          Expand();
         }
-      }
 
-      std::discrete_distribution<int> dist(uct.begin(), uct.end());
-      return dist(rand_);
-    }
+        node_.visits++;
 
-    void Expand(uint64_t parent_key, bool player) {
-      Node& node = tree_[parent_key];
-      if (node.is_terminal) {
-        return;
-      }
-      auto parent_board = Board::New(parent_key);
-      auto valid_moves = parent_board->ValidMoves();
-      if (valid_moves.empty()) {
-        node.is_terminal = true;
-        node.reward = 1;
-        return;
-      }
-      for (int move : valid_moves) {
-        auto child_board = parent_board->Clone();
-        bool game_over = child_board->PlayStone(player, move);
-        uint64_t child_key = child_board->Encode();
-        if (game_over) {
-          auto& n = tree_[child_key];
-          n.reward = (player == player_id_) ? 2 : 0;
-          n.is_terminal = true;
+        if (node_.is_terminal) {
+          return node_.reward;
         }
-        node.next.push_back(child_key);
+
+
+        int selected = SelectNodeIndex(&Turn::CalculateUct);
+        float result = NextTurns()[selected].Mcts();
+        node_.reward += result;
+        return result;
       }
-    }
-
-    float Mcts(uint64_t key, bool player) {
-      Node& node = tree_[key];
-
-      if (node.visits == 0) {
-        Expand(key, player);
-      }
-
-      node.visits++;
-
-      if (node.next.empty()) {
-        return node.reward;
-      }
-
-      float result = Mcts(node.next[SelectNodeIndex(node, player, true)], !player);
-      node.reward += result;
-      return result;
-    }
+    };
 
     int GetMove() override {
       auto valid_moves = board_->ValidMoves();
@@ -122,32 +156,35 @@ class MonteCarloPlayer : public Player {
         throw std::runtime_error("no valid moves");
       }
 
-      uint64_t root_key = board_->Encode();
+      Turn turn(this);
+
       for (int i = 0; i < kNumRollouts; ++i) {
-        Mcts(root_key, player_id_);
+        turn.Mcts();
       }
 
-      const Node& root = tree_[root_key];
+      const Node& root = turn.node_;
       std::cout << "Root visits: " << root.visits << '\n';
       int i = 0;
-      for (uint64_t child : root.next) {
-        const Node& n = tree_[child];
-        std::cout << "utc[" << (valid_moves[i++]+1) << "] = " << CalculateUct(n, root.visits, player_id_)
-          << " - " << n.reward << "/" << n.visits << " terminal=" << n.is_terminal
+      for (const auto& next_turn : turn.NextTurns()) {
+        std::cout << "utc[" << (valid_moves[i++]+1) << "] = "
+          << next_turn.CalculateUct()
+          << " - " << next_turn.node_.reward << "/" << next_turn.node_.visits
+          << " terminal=" << next_turn.node_.is_terminal
           << '\n';
-          int j = 0;
-          for (uint64_t gt : n.next) {
-            const Node& m = tree_[gt];
-            std::cout << "... utc[" << (valid_moves[j++]+1) << "] = "
-              << CalculateUct(m, n.visits, !player_id_)
-              << " - " << m.reward << "/" << m.visits << " terminal=" << m.is_terminal
-              << '\n';
 
+          int j = 0;
+          for (const auto& next_next_turn : next_turn.NextTurns()) {
+            const Node& m = next_next_turn.node_;
+            std::cout << "... utc[" << (valid_moves[j++]+1) << "] = "
+              << next_next_turn.CalculateUct()
+              << " - " << m.reward << "/" << m.visits
+              << " terminal=" << m.is_terminal
+              << '\n';
           }
       }
 
-      int move = valid_moves[SelectNodeIndex(root, player_id_, false)];
-      std::cout << "\nMCTS Plays " << (move+1) << '\n';
+      int move = valid_moves[turn.SelectNodeIndex(&Turn::CalculateRootScore)];
+      std::cout << "\n" << name() << " plays " << (move+1) << '\n';
       return move;
     }
 
@@ -159,16 +196,18 @@ class MonteCarloPlayer : public Player {
     std::map<uint64_t, Node> tree_;
 
   public:
-    MonteCarloPlayer(std::string_view name, int num_rollouts,
+    MonteCarloPlayer(
+        std::string_view name, int num_rollouts, double exploration,
         std::unique_ptr<std::random_device> rd)
       : Player(name),
         kNumRollouts(num_rollouts),
-        kExplorationParameter(std::sqrt(2)),
+        kExplorationParameter(exploration),
         rand_((*rd)()) {}
 };
 
-Player* Player::NewMonteCarlo(std::string_view name, int num_rollouts,
-            std::unique_ptr<std::random_device> rd) {
-  return new MonteCarloPlayer(name, num_rollouts, std::move(rd));
+Player* Player::NewMonteCarlo(std::string_view name,
+    int num_rollouts, double exploration,
+    std::unique_ptr<std::random_device> rd) {
+  return new MonteCarloPlayer(name, num_rollouts, exploration, std::move(rd));
 }
 

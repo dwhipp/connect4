@@ -12,10 +12,13 @@ class Board;
 class Player {
   public:
     static Player *NewHuman(std::string_view name);
-    static Player *NewBruteForce(std::string_view name,
+    static Player *NewBruteForce(
+        std::string_view name,
         int depth, double sharpness, double discount,
         std::unique_ptr<std::random_device> rd);
-    static Player *NewMonteCarlo(std::string_view name, int num_rollouts,
+    static Player *NewMonteCarlo(
+        std::string_view name,
+        int num_rollouts, double exploration,
         std::unique_ptr<std::random_device> rd);
 
     std::string_view name() const { return name_; }
