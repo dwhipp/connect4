@@ -3,8 +3,9 @@
 
 #include <cinttypes>
 #include <iostream>
-#include <vector>
 #include <memory>
+#include <utility>
+#include <vector>
 
 class Board {
   public:
@@ -20,6 +21,9 @@ class Board {
     virtual bool IsValidMove(int column) const = 0;
     virtual std::vector<int> ValidMoves() const = 0;
     virtual bool PlayStone(bool player, int column) = 0;
+
+    virtual std::pair<bool, uint64_t> PlayHypothetical(
+        bool player, int column) = 0;
 
     virtual uint64_t Encode() const = 0;
     virtual void Decode(uint64_t position) = 0;

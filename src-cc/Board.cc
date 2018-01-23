@@ -102,6 +102,14 @@ class BoardImpl : public Board {
     return false;
   }
 
+  std::pair<bool, uint64_t> PlayHypothetical(
+      bool player, int column) override {
+    bool result = PlayStone(player, column);
+    uint64_t encoded = Encode();
+    cells[column].pop_back();
+    return {result, encoded};
+  }
+
   char get_cell(int row, int col) const {
     if ((col >= (int)cells.size()) ||
         (row >= (int)cells[col].size())) {

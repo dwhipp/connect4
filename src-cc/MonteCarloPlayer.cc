@@ -110,23 +110,23 @@ class MonteCarloPlayer : public Player {
         if (node_.is_terminal) {
           return;
         }
-        auto parent_board = Board::New(board_state_);
-        auto valid_moves = parent_board->ValidMoves();
+        auto board = Board::New(board_state_);
+        auto valid_moves = board->ValidMoves();
         if (valid_moves.empty()) {
           node_.is_terminal = true;
           node_.reward = 0.5;
           return;
         }
         for (int move : valid_moves) {
-          auto child_board = parent_board->Clone();
-          bool game_over = child_board->PlayStone(turn_player_id_, move);
-          Turn next_turn(this, child_board->Encode());
-          if (game_over) {
+          auto [is_terminal, child_key] = board->PlayHypothetical(
+              turn_player_id_, move);
+          if (is_terminal) {
+            Turn next_turn(this, child_key);
             Node& child = next_turn.node_;
             child.reward = is_opponent_ ? 0 : 1;
             child.is_terminal = true;
           }
-          node_.next.push_back(next_turn.board_state_);
+          node_.next.push_back(child_key);
         }
       }
 
@@ -135,17 +135,34 @@ class MonteCarloPlayer : public Player {
           Expand();
         }
 
-        node_.visits++;
+        ++node_.visits;
 
         if (node_.is_terminal) {
           return node_.reward;
         }
 
-
         int selected = SelectNodeIndex(&Turn::CalculateUct);
-        float result = NextTurns()[selected].Mcts();
+        Turn next_turn = NextTurns()[selected];
+        float result = node_.visits == 1 ? next_turn.RandomPlayout()
+                                         : next_turn.Mcts();
         node_.reward += result;
         return result;
+      }
+
+      float RandomPlayout() {
+        auto board = Board::New(board_state_);
+        bool who = turn_player_id_;
+        while (true) {
+          auto valid_moves = board->ValidMoves();
+          if (valid_moves.empty()) {
+            return 0.5;
+          }
+          std::uniform_int_distribution<> dist(0, valid_moves.size() - 1);
+          if (board->PlayStone(who, valid_moves[dist(player_->rand_)])) {
+            return who == player_->player_id_ ? 1 : 0;
+          }
+          who = !who;
+        }
       }
     };
 
@@ -163,7 +180,9 @@ class MonteCarloPlayer : public Player {
       }
 
       const Node& root = turn.node_;
-      std::cout << "Root visits: " << root.visits << '\n';
+      std::cout << "Root visits: " << root.visits
+        << ", tree_size=" << tree_.size()
+        << '\n';
       int i = 0;
       for (const auto& next_turn : turn.NextTurns()) {
         std::cout << "utc[" << (valid_moves[i++]+1) << "] = "

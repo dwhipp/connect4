@@ -15,7 +15,7 @@ int main() {
       "Brute Force", 5, .9999, .999,
       std::make_unique<std::random_device>());
   auto p3 = Player::NewMonteCarlo(
-      "Monte Carlo", 5000, std::sqrt(2),
+      "Monte Carlo", 10000, std::sqrt(2),
       std::make_unique<std::random_device>());
 
   Game g(p1, p3);
