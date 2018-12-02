@@ -224,9 +224,9 @@ class MonteCarloPlayer : public Player {
         rand_((*rd)()) {}
 };
 
-Player* Player::NewMonteCarlo(std::string_view name,
+std::unique_ptr<Player> Player::NewMonteCarlo(std::string_view name,
     int num_rollouts, double exploration,
     std::unique_ptr<std::random_device> rd) {
-  return new MonteCarloPlayer(name, num_rollouts, exploration, std::move(rd));
+  return std::unique_ptr<Player>{new MonteCarloPlayer(name, num_rollouts, exploration, std::move(rd))};
 }
 

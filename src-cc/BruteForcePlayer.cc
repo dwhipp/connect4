@@ -79,8 +79,8 @@ class BruteForcePlayer : public Player {
       }
 };
 
-Player* Player::NewBruteForce(std::string_view name,
+std::unique_ptr<Player> Player::NewBruteForce(std::string_view name,
     int depth, double sharpness, double discount,
     std::unique_ptr<std::random_device> rd) {
-  return new BruteForcePlayer(name, depth, sharpness, discount, std::move(rd));
+  return std::unique_ptr<Player>{new BruteForcePlayer(name, depth, sharpness, discount, std::move(rd))};
 }

@@ -28,7 +28,7 @@ class HumanPlayer : public Player {
     using Player::Player;
 };
 
-Player* Player::NewHuman(std::string_view name) {
-  return new HumanPlayer(name);
+std::unique_ptr<Player> Player::NewHuman(std::string_view name) {
+  return std::unique_ptr<Player>{new HumanPlayer(name)};
 }
 
