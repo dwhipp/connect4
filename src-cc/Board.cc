@@ -1,62 +1,109 @@
 #include "Board.h"
 
+#include <array>
 #include <utility>
 #include <optional>
 #include <vector>
 #include <exception>
 
 namespace {
-  int intlog2(int value) {
-    int result = 0;
-    while (value > 0) {
-      value /= 2;
-      result ++;
+
+class BoardData {
+  static constexpr uint64_t kSimdOne = 0x0101010101010101ull;
+
+  class Column {
+    unsigned char value_;
+
+   public:
+    int size() const {
+      return 31 - __builtin_clz(value_);
+    }
+
+    bool operator[](int row_index) const {
+      auto mask = 0x1u << row_index;
+      return (value_ & mask) != 0;
+    }
+
+    void push_back(bool value) {
+      auto mask = 0x1u << size();
+      if (!value) value_ ^= mask;
+      value_ |= mask << 1;
+    }
+
+    void pop_back() {
+      auto mask = 0x1u << size();
+      value_ ^= mask;
+      value_ |= mask >> 1;
+    }
+
+    unsigned char bitmap(bool player) const {
+      auto mask = 0x1u << size();
+      unsigned char result = value_ ^ mask;
+      if (!player) result ^= mask - 1;
+      return result;
+    }
+  };
+
+  union Magic {
+    std::array<Column, 8> columns;
+    uint64_t encoded;
+    Magic(uint64_t encoded_position = 0) :
+        encoded(encoded_position != 0 ? encoded_position : kSimdOne) {}
+    static_assert(sizeof(columns) == sizeof(encoded));
+  } board_state_;
+
+ public:
+  BoardData() : board_state_() {}
+  explicit BoardData(uint64_t encoded_position) : board_state_(encoded_position) {}
+
+  uint64_t Encode() const { return board_state_.encoded; }
+  void Decode(uint64_t position) { board_state_.encoded = position; }
+
+  int size() const { return Board::kWidth; }
+  const Column& operator[](int column_index) const { return board_state_.columns[column_index]; }
+  Column& operator[](int column_index) { return board_state_.columns[column_index]; }
+
+  auto GetBitmap(bool player) const {
+    std::array<unsigned char, Board::kWidth> result;
+    for (int i = 0 ; i < Board::kWidth; i++) {
+      result[i] = board_state_.columns[i].bitmap(player);
     }
     return result;
   }
-}
+};
 
 class Slice {
+  private:
+    const int col_;
+    const int row_;
+    const unsigned char mask_;
+    const std::array<unsigned char, Board::kWidth> bitmap_;
+
   public:
-    Slice(std::vector<std::vector<bool>>& data, std::pair<int, int> center) :
-      data_(data), center_(center) {}
+    Slice(BoardData data, std::pair<int, int> center) :
+      col_(center.first),
+      row_(center.second), 
+      mask_(1u << row_),
+      bitmap_(data.GetBitmap(data[col_][row_])) {}
 
     int SpanLength(std::pair<int, int> direction) const {
+      auto BoardBits = [&](int offset) -> unsigned char {
+        int index = col_ + offset * direction.first;
+        if (index < 0 || index >= Board::kWidth) return 0;
+        return bitmap_[index];
+      };
+      auto MaskBits = [&](int offset) -> unsigned char {
+        return mask_ >> offset * direction.second;
+      };
       int length = 1;
-      bool root = ValueAt(center_);
-      for (int i = 1; IsSame(root, i, direction); ++i) ++length;
-      for (int i = -1; IsSame(root, i, direction); --i) ++length;
+      for (int i = 1; BoardBits(i) & MaskBits(i); ++i) ++length;
+      for (int i = -1; BoardBits(i) & MaskBits(i); --i) ++length;
       return length;
     }
-
-  private:
-    bool ValueAt(std::pair<int, int> point) const {
-      auto [x,y] = point;
-      return data_[x][y];
-    }
-
-    bool IsSame(bool value, int index, std::pair<int,int> direction) const {
-      auto [x,y] = center_;
-      auto [dx,dy] = direction;
-      int col = x + index * dx;
-      int row = y + index * dy;
-      if (row < 0 || col < 0 ||
-          col >= (int)data_.size() || row >= (int)data_[col].size()) {
-        return false;
-      }
-      return data_[col][row] == value;
-    }
-
-  private:
-    const std::vector<std::vector<bool>>& data_;
-    std::pair<int, int> center_;
-
 };
 
 class BoardImpl : public Board {
-  const int kHeightBits = intlog2(kHeight);
-  const uint64_t kHeightMask = (1ull << kHeightBits) - 1;
-  std::vector<std::vector<bool>> cells;
+  BoardData cells;
   std::optional<std::pair<int,int>> last_move_;
 
   bool IsValidMove(int column) const override {
@@ -137,37 +184,19 @@ class BoardImpl : public Board {
   }
 
   uint64_t Encode() const override {
-    uint64_t value = 0;
-    for (int col = kWidth - 1; col >= 0; --col) {
-      const int height = cells[col].size();
-      for (int row = 0; row < height; ++row) {
-        value <<= 1;
-        value |= cells[col][row] ? 1u: 0u;
-      }
-      value <<= kHeightBits;
-      value |= height;
-    }
-    return value;
+    return cells.Encode();
   }
 
   void Decode(uint64_t position) override {
-    for (int col = 0; col < kWidth; ++col) {
-      int height = position & kHeightMask;
-      position >>= kHeightBits;
-      cells[col].resize(height);
-      for (int row = height - 1; row >= 0; --row) {
-        cells[col][row] = position & 1;
-        position >>= 1;
-      }
-    }
+    cells.Decode(position);
   }
 
-  public:
-  BoardImpl() : cells(kWidth) {}
-  /*explict*/ BoardImpl(uint64_t position) : BoardImpl() {
-    Decode(position);
-  }
+ public:
+  BoardImpl() : cells() {}
+  /*explict*/ BoardImpl(uint64_t position) : cells(position) {}
 };
+
+}
 
 std::unique_ptr<Board> Board::New(uint64_t position) {
   return std::unique_ptr<Board>(new BoardImpl(position));
