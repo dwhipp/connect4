@@ -1,6 +1,7 @@
 #include "Player.h"
 
 #include <iostream>
+#include <cctype>
 
 std::unique_ptr<Player> Player::New(std::string_view name_spec) {
   if (name_spec.empty()) {
@@ -11,8 +12,17 @@ std::unique_ptr<Player> Player::New(std::string_view name_spec) {
   std::string_view name =
       name_spec.size() == 1
         ? ""
-        : name_spec[1] == ':' ? name_spec.substr(2) : name_spec;
+        : name_spec.find(':') == name_spec.npos
+          ? name_spec
+          : name_spec.substr(name_spec.find(':') + 1);
 
+  std::vector<int> args;
+  for (size_t idx = 1;
+      idx < name_spec.size() && std::isdigit(name_spec[idx]);
+      idx++) {
+    args.push_back(std::stoi(std::string{name_spec.substr(idx)}, &idx));
+  }
+  
   switch (name_spec.front()) {
     case 'h':
       return Player::NewHuman(name.empty() ? "Human" : name);
@@ -20,7 +30,7 @@ std::unique_ptr<Player> Player::New(std::string_view name_spec) {
     case 'b':
       return Player::NewBruteForce(
         (name.empty() ? "Brute Force" : name),
-        /*depth=*/ 5,
+        /*depth=*/ args.empty() ? 5 : args[0],
         /*sharpness=*/ .9999,
         /*discount=*/ .999,
         std::make_unique<std::random_device>());
@@ -28,7 +38,7 @@ std::unique_ptr<Player> Player::New(std::string_view name_spec) {
     case 'm':
       return Player::NewMonteCarlo(
           (name.empty() ? "Monte Carlo" : name),
-          /*num_rollouts=*/10000,
+          /*num_rollouts=*/ args.empty() ? 10000 : args[0],
           /*exploration=*/std::sqrt(2),
           std::make_unique<std::random_device>());
 
